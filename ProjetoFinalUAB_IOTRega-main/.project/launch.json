@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pharmahouse-api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["src/server.js"],
+      "cwd": "pharmahouse-live/backend",
+      "port": 4000
+    },
+    {
+      "name": "iot-rega-backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "iot-rega/backend",
+      "port": 3000
+    },
+    {
+      "name": "iot-rega-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "iot-rega/frontend",
+      "port": 5173
+    }
+  ]
+}

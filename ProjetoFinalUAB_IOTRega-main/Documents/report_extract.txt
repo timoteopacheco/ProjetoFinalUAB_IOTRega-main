@@ -1,0 +1,939 @@
+
+
+===== PAGE 1 =====
+Projeto Final em Engenharia Informática
+Relatório Intermédio
+6 DE MAIO DE 2026
+Susana Pedro 2202973
+António Pacheco 2100357
+Ricardo José Vieira Baptista
+6 de Maio de 2026
+
+===== PAGE 2 =====
+Índice
+Organização do Relatório 2
+Descrição e objetivos do trabalho 3
+1.1. Proposta para o trabalho 3
+1.2. Objetivos 3
+1.3. Resultados esperados 4
+1.4. Cronograma 4
+Fundamentos/Estado-da-arte 5
+2.1. Internet of Things (IoT) 5
+2.1.1. MQTT 5
+2.2. Sistemas de Bases de Dados 5
+2.3. Sistemas de Alertas Inteligentes 6
+2.4. Integração de Dados Meteorológicos 6
+2.5. Arquitetura do Sistema Web 6
+Protótipo 7
+3.1. Arquitetura do Sistema 7
+3.1.1. Diagrama de Arquitetura 7
+3.1.2. Backend e APIs 8
+3.1.3. Organização Modular do Backend 11
+3.2. Pipeline IoT 12
+3.3. Modelação de dados 12
+3.3.1 Diagrama Relacional 12
+3.3.2 Descrição do Modelo de Dados 13
+3.3.3 Modelo Físico (Schema) 20
+3.4. Estado atual e Resultados Preliminares 24
+PÁGINA 1
+
+===== PAGE 3 =====
+Introdução
+O presente projeto consiste no desenvolvimento de uma plataforma integrada de
+suporte à decisão para a gestão de rega em contexto agrícola, com foco no setor
+vitivinícola. A solução proposta combina tecnologias de Internet of Things (IoT),
+sistemas de informação geográfica (SIG) e análise de dados, permitindo a
+monitorização contínua de variáveis ambientais e a geração de alertas inteligentes para
+apoio à tomada de decisão.
+A relevância deste trabalho advém da crescente necessidade de otimização de recursos
+hídricos e da digitalização do setor agrícola. A integração de sensores IoT com dados
+meteorológicos e mecanismos de análise permite aumentar a eficiência operacional,
+reduzir custos e melhorar a sustentabilidade.
+Este projeto contribui tanto a nível académico — integrando conhecimentos de
+sistemas distribuídos, bases de dados e engenharia de software — como a nível prático,
+ao propor uma solução aplicável em contextos reais de agricultura de precisão.
+ORGANIZAÇÃO DO RELATÓRIO
+O presente relatório encontra-se estruturado em três capítulos principais:
+● Capítulo 1: descrição do projeto, objetivos e planeamento;
+● Capítulo 2: enquadramento teórico e tecnológico;
+● Capítulo 3: descrição do protótipo e estado atual da implementação.
+PÁGINA 2
+
+===== PAGE 4 =====
+Capítulo 1
+Descrição e objetivos do trabalho
+Este capítulo apresenta a proposta do projeto, os objetivos definidos, os resultados
+esperados e o estado atual face ao cronograma.
+1.1. PROPOSTA PARA O TRABALHO
+O projeto propõe o desenvolvimento de uma plataforma digital composta por backend,
+frontend e integração com sensores IoT, capaz de:
+● Agregar dados provenientes de sensores agrícolas (humidade, temperatura,
+etc.);
+● Integrar dados meteorológicos externos;
+● Fornecer visualização geoespacial (WebSIG);
+● Gerar alertas inteligentes com base em regras configuráveis.
+A solução baseia-se numa arquitetura distribuída, onde sensores comunicam via
+MQTT, sendo os dados processados por um backend central e armazenados numa base
+de dados relacional com suporte geoespacial.
+1.2. OBJETIVOS
+Objetivo geral
+Desenvolver uma plataforma Web e Mobile para apoio à decisão na rega agrícola
+baseada em dados IoT e meteorológicos.
+Objetivos específicos
+● Implementar ingestão de dados IoT via MQTT;
+● Criar APIs REST para gestão de dados;
+● Desenvolver sistema de alertas baseado em regras;
+● Integrar dados climáticos externos;
+● Implementar dashboards e visualização geográfica;
+● Desenvolver sistema de autenticação e controlo de acessos.
+PÁGINA 3
+
+===== PAGE 5 =====
+1.3. RESULTADOS ESPERADOS
+Espera-se obter:
+● Um protótipo funcional do sistema;
+● Integração de sensores e dados meteorológicos;
+● Sistema de alertas operacionais;
+● Dashboard com dados agregados;
+● Base para evolução futura com algoritmos de IA.
+1.4. CRONOGRAMA
+O projeto segue uma abordagem incremental, com fases definidas desde levantamento
+de requisitos até validação final.
+Atualmente, o projeto encontra-se na fase de “Desenvolvimento backend e
+integração de serviços IoT” conforme planeamento inicial.
+Cronograma atualizado
+PÁGINA 4
+
+===== PAGE 6 =====
+Análise do Cronograma
+O projeto encontra-se numa fase intermédia de desenvolvimento, com os requisitos,
+modelação e relatório intermédio já concluídos. Atualmente, o foco principal está no
+desenvolvimento do backend, integração MQTT, sistema de alertas e preparação dos
+dashboards WebSIG.
+A componente do pipeline IoT apresentou alguns riscos e pequenos atrasos devido à
+complexidade da integração em tempo real, embora já se encontre funcional em
+ambiente de testes. As próximas fases incluem desenvolvimento frontend, testes finais,
+ajustes finais e elaboração do relatório final.
+PÁGINA 5
+
+===== PAGE 7 =====
+Capítulo 2
+Fundamentos/Estado-da-arte
+Este capítulo descreve os principais conceitos tecnológicos que sustentam o projeto.
+2.1. INTERNET OF THINGS (IOT)
+A IoT permite a recolha contínua de dados através de dispositivos distribuídos. No
+projeto, sensores comunicam via protocolo MQTT, adequado para sistemas com baixa
+latência e consumo reduzido.
+2.1.1. MQTT
+O protocolo MQTT é utilizado para ingestão de dados de sensores, permitindo
+comunicação assíncrona e eficiente.
+No backend implementado:
+● Subscrição a tópicos (iotrega/#);
+● Processamento de mensagens JSON;
+● Inserção em base de dados.
+Exemplo real implementado:
+O sistema processa mensagens contendo device_id, value e time, armazenando
+leituras e acionando avaliação de regras .
+2.2. SISTEMAS DE BASES DE DADOS
+O sistema utiliza PostgreSQL com extensões:
+● PostGIS → dados geoespaciais
+● TimescaleDB → séries temporais
+Permite:
+● Armazenamento eficiente de leituras;
+● Consultas temporais e agregações;
+● Georreferenciação de talhões.
+PÁGINA 6
+
+===== PAGE 8 =====
+A ligação é gerida através de pool de conexões, garantindo desempenho e
+escalabilidade.
+2.3. SISTEMAS DE ALERTAS INTELIGENTES
+O sistema implementa um mecanismo baseado em regras:
+● Cada regra define condição (>, <, etc.);
+● Avaliação automática das leituras;
+● Criação de alertas persistentes.
+Exemplo:
+● Se humidade < threshold → gerar alerta.
+Implementação:
+● Avaliação individual por sensor;
+● Verificação de duplicados;
+● Persistência em base de dados .
+2.4. INTEGRAÇÃO DE DADOS METEOROLÓGICOS
+O sistema integra dados da API Open-Meteo:
+● Dados horários e previsões;
+● Armazenamento local;
+● Utilização para análise e apoio à decisão.
+A recolha é automatizada via tarefas periódicas (cron)
+2.5. ARQUITETURA DO SISTEMA WEB
+O backend segue arquitetura REST baseada em Node.js:
+● Separação em camadas:
+○ Rotas
+○ Serviços
+○ Middleware
+● Autenticação JWT;
+● Tratamento global de erros.
+PÁGINA 7
+
+===== PAGE 9 =====
+Capítulo 3
+Protótipo
+Este capítulo descreve o estado atual da implementação.
+3.1. ARQUITETURA DO SISTEMA
+A arquitetura implementada inclui:
+● Backend Node.js (Express);
+● Base de dados PostgreSQL;
+● Serviços IoT (MQTT);
+● Integração externa (API meteorológica).
+O sistema é iniciado através de um servidor que:
+● Expõe APIs REST;
+● Liga ao broker MQTT;
+● Executa tarefas agendadas (cron)
+3.1.1. Diagrama de Arquitetura
+Figura 1 - Diagrama de Arquitetura
+PÁGINA 8
+
+===== PAGE 10 =====
+3.1.2. Backend e APIs
+Foram implementados vários módulos no backend da aplicação, seguindo uma
+arquitetura modular baseada em Node.js e Express, organizada por responsabilidades
+funcionais.
+Autenticação
+● Registo e login com JWT;
+● Proteção de rotas;
+● Middleware de autenticação;
+● Controlo de permissões por utilizador.
+Gestão de dados
+● Gestão de explorações agrícolas (farms);
+● Gestão de talhões (plots);
+● Gestão de sensores IoT;
+● Registo de leituras;
+● Gestão de custos operacionais.
+Dashboard
+● Agregação de dados;
+● Estatísticas em tempo real;
+● Indicadores operacionais;
+● Dados para visualização gráfica.
+Evidências de Implementação
+A aplicação possui múltiplas rotas REST implementadas, responsáveis pela
+comunicação entre frontend, sensores IoT e base de dados.
+Exemplo de Rotas Implementadas:
+● Leituras de Sensores (TimescaleDB)
+PÁGINA 9
+
+===== PAGE 11 =====
+● Gestão de Talhões
+● Sistema de Regras e alertas
+PÁGINA 10
+
+===== PAGE 12 =====
+● Integração Central da Aplicação - O ficheiro principal app.js centraliza:
+● middleware;
+● autenticação;
+● carregamento de rotas;
+● inicialização de serviços MQTT;
+● tarefas agendadas (cron jobs)
+Considerações Técnicas
+A estrutura implementada evidencia:
+● separação clara entre camadas;
+● modularidade do backend;
+● reutilização de middleware;
+● integração com serviços IoT e APIs externas;
+● suporte a dados geoespaciais e séries temporais.
+A organização do código facilita:
+● evolução futura;
+● manutenção;
+● testes;
+PÁGINA 11
+
+===== PAGE 13 =====
+● escalabilidade da solução.
+3.1.3. Organização Modular do Backend
+O backend foi organizado segundo uma estrutura modular, facilitando:
+● manutenção;
+● escalabilidade;
+● separação de responsabilidades;
+● reutilização de componentes.
+Exemplo da estrutura implementada:
+/project
+│
+├── /db
+│ └── schema.sql
+│
+├── /src
+│ ├── app.js
+│ │
+│ ├── /config
+│ │ └── database.js
+│ │
+│ ├── /middleware
+│ │ ├── auth.js
+│ │ └── errorHandler.js
+│ │
+│ ├── /routes
+│ │ ├── alerts.js
+│ │ ├── auth.js
+│ │ ├── costs.js
+│ │ ├── dashboards.js
+│ │ ├── farms.js
+│ │ ├── plots.js
+│ │ ├── reading.js
+│ │ ├── rules.js
+│ │ ├── sensors.js
+│ │ └── weather.js
+│ │
+│ └── /services
+│ ├── alertService.js
+│ ├── mqttService.js
+│ └── weatherService.js
+│
+PÁGINA 12
+
+===== PAGE 14 =====
+└── /docs
+├── Relatório_intermédio.pdf
+└── Modelo_ER_App_Rega_IoT.png
+3.2. PIPELINE IOT
+O sistema suporta:
+● Ingestão via MQTT;
+● Simulação de sensores (modo desenvolvimento);
+● Processamento automático de mensagens.
+Além disso:
+● Os dados são imediatamente avaliados por regras;
+● Alertas são gerados em tempo real.
+3.3. MODELAÇÃO DE DADOS
+A estrutura da base de dados foi concebida para suportar os requisitos funcionais e não
+funcionais da plataforma de gestão inteligente de rega baseada em IoT. O modelo segue
+uma abordagem modular e relacional, permitindo organizar os dados agrícolas,
+sensores, clima, alertas e utilizadores de forma coerente, escalável e eficiente.
+3.3.1 Diagrama Relacional
+PÁGINA 13
+
+===== PAGE 15 =====
+Figura 2 - Diagrama Relacional da Dados
+3.3.2 Descrição do Modelo de Dados
+Tabela farm
+A tabela farm representa a entidade principal do sistema: a exploração agrícola.
+Objetivo
+Permitir a gestão de múltiplas explorações agrícolas dentro da plataforma.
+Justificação
+Uma exploração pode conter vários talhões, sensores e infraestruturas. A separação
+desta entidade permite:
+● organização hierárquica dos dados;
+● suporte multiutilizador;
+● escalabilidade da aplicação.
+Campos relevantes
+PÁGINA 14
+
+===== PAGE 16 =====
+● location GEOGRAPHY(Point,4326)
+Utilizado para armazenar coordenadas geográficas reais da exploração através
+do PostGIS.
+Tabela plot
+A tabela plot representa os talhões agrícolas pertencentes a uma exploração.
+Objetivo
+Permitir subdividir a exploração agrícola em áreas geográficas específicas.
+Justificação
+Cada talhão possui características próprias:
+● sensores específicos;
+● sistemas de rega;
+● culturas;
+● custos;
+● dados climáticos.
+A utilização de: geometry GEOMETRY(POLYGON,4326), permite armazenar os limites
+geográficos do talhão, essenciais para:
+● visualização WebSIG;
+● cálculos espaciais;
+● integração com mapas.
+Tabela sensor
+A tabela sensor representa os dispositivos IoT instalados nos talhões.
+Objetivo
+Gerir sensores responsáveis pela recolha de dados ambientais.
+Justificação
+A separação desta entidade permite:
+● identificar diferentes tipos de sensores;
+● associar sensores a talhões;
+● suportar múltiplos dispositivos por área agrícola.
+PÁGINA 15
+
+===== PAGE 17 =====
+Campos importantes
+● type
+Identifica o tipo de sensor:
+○ humidade;
+○ temperatura;
+○ humidade do solo;
+○ precipitação.
+● device_id
+Necessário para integração MQTT e identificação física do dispositivo.
+Tabela sensor_reading
+A tabela sensor_reading armazena as leituras temporais dos sensores.
+Objetivo
+Guardar dados recolhidos continuamente pelos sensores IoT.
+Justificação
+Trata-se da tabela central do sistema IoT, responsável por armazenar:
+● medições temporais;
+● histórico ambiental;
+● séries temporais.
+Uso de TimescaleDB
+A tabela é transformada em hypertable através de “SELECT
+create_hypertable('sensor_reading','time');”
+Isto permite:
+● otimização de consultas temporais;
+● maior desempenho;
+● compressão eficiente de dados históricos.
+Tabela weather_data
+A tabela weather_data armazena dados meteorológicos históricos.
+Objetivo
+PÁGINA 16
+
+===== PAGE 18 =====
+Complementar os dados IoT com informação climática externa.
+Justificação
+Os sensores locais não fornecem toda a informação necessária para apoio à decisão
+agrícola. Assim, são integrados dados:
+● temperatura;
+● humidade;
+● precipitação;
+● vento.
+Estes dados permitem:
+● comparação entre leituras locais e clima externo;
+● análises históricas;
+● suporte à decisão de rega.
+Tabela weather_forecast
+A tabela weather_forecast armazena previsões meteorológicas futuras.
+Objetivo
+Disponibilizar previsões climáticas para apoio preventivo à rega.
+Justificação
+A integração de previsões permite:
+● antecipar necessidades hídricas;
+● evitar desperdício de água;
+● otimizar operações agrícolas.
+Exemplo
+A probabilidade de chuva (probability_rain) pode impedir ativações
+desnecessárias do sistema de rega.
+Tabela rule
+A tabela rule define regras de monitorização.
+Objetivo
+PÁGINA 17
+
+===== PAGE 19 =====
+Permitir configurar condições automáticas de análise dos sensores.
+Justificação
+O sistema necessita de lógica flexível para avaliação de eventos:
+● humidade baixa;
+● temperatura elevada;
+● valores críticos.
+Campos relevantes
+● condition
+● threshold - Valor limite da regra.
+Tabela alert
+A tabela alert armazena alertas gerados automaticamente.
+Objetivo
+Registar eventos críticos identificados pelo motor de regras.
+Justificação
+Os alertas representam:
+● anomalias;
+● condições críticas;
+● notificações operacionais.
+A separação desta entidade permite:
+● histórico de alertas;
+● rastreabilidade;
+● dashboards e notificações.
+Tabela irrigation_system
+A tabela irrigation_system representa sistemas físicos de rega.
+Objetivo
+Modelar infraestruturas associadas aos talhões.
+PÁGINA 18
+
+===== PAGE 20 =====
+Justificação
+Permite:
+● caracterizar o tipo de rega;
+● associar capacidade operacional;
+● preparar futura automação.
+Exemplos
+● drip (gota-a-gota)
+● sprinkler (aspersão)
+Tabela cost_record
+A tabela cost_record armazena custos operacionais.
+Objetivo
+Permitir controlo financeiro da exploração agrícola.
+Justificação
+O projeto não se limita à monitorização técnica; pretende também:
+● apoiar gestão económica;
+● analisar eficiência;
+● comparar custos entre talhões.
+Dados armazenados
+● custos de água;
+● energia;
+● manutenção;
+● fertilização.
+Tabela app_user
+A tabela app_user representa os utilizadores da plataforma.
+Objetivo
+Implementar autenticação e gestão de acessos.
+PÁGINA 19
+
+===== PAGE 21 =====
+Justificação
+Necessária para:
+● login;
+● autenticação JWT;
+● controlo multiutilizador.
+Campo relevante
+● email UNIQUE - garante unicidade de contas.
+Tabela user_farm
+A tabela user_farm implementa a relação entre utilizadores e explorações agrícolas.
+Objetivo
+Permitir múltiplos utilizadores por exploração.
+Justificação
+A relação User N:M Farm
+permite:
+● administradores;
+● técnicos;
+● operadores agrícolas.
+Campo relevante
+● role
+Define permissões:
+● owner;
+● admin;
+● viewer.
+Justificação dos Índices
+Índice Objetivo
+idx_plot_geom consultas espaciais PostGIS
+PÁGINA 20
+
+===== PAGE 22 =====
+idx_sensor_plot pesquisa por talhão
+idx_weather_time consultas temporais
+idx_reading_time séries temporais
+idx_alert_sensor histórico de alertas
+3.3.3 Modelo Físico (Schema)
+-- ============================================================
+-- IoT Rega Platform - Schema PostgreSQL + PostGIS + TimescaleDB
+-- Autor: António Pacheco | nº 2100357 | Susana Pedro | nº 2202973 | UAB
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+-- ------------------------------------------------------------
+-- USERS
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS app_user (
+id SERIAL PRIMARY KEY,
+name VARCHAR(100) NOT NULL,
+email VARCHAR(150) UNIQUE NOT NULL,
+password TEXT NOT NULL,
+role VARCHAR(20) DEFAULT 'user' CHECK (role IN
+('admin','user','viewer')),
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- ------------------------------------------------------------
+-- FARMS (Explorações)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS farm (
+id SERIAL PRIMARY KEY,
+name VARCHAR(100) NOT NULL,
+description TEXT,
+location GEOGRAPHY(Point, 4326),
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- ------------------------------------------------------------
+-- USER_FARM (relação N:M utilizador <-> exploração)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_farm (
+user_id INT REFERENCES app_user(id) ON DELETE CASCADE,
+farm_id INT REFERENCES farm(id) ON DELETE CASCADE,
+role VARCHAR(50) DEFAULT 'member',
+PRIMARY KEY (user_id, farm_id)
+);
+PÁGINA 21
+
+===== PAGE 23 =====
+-- ------------------------------------------------------------
+-- PLOTS (Talhões)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS plot (
+id SERIAL PRIMARY KEY,
+farm_id INT NOT NULL REFERENCES farm(id) ON DELETE CASCADE,
+name VARCHAR(100) NOT NULL,
+area FLOAT,
+geometry GEOMETRY(POLYGON, 4326),
+crop_type VARCHAR(50) DEFAULT 'vinha',
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_plot_farm ON plot(farm_id);
+CREATE INDEX IF NOT EXISTS idx_plot_geom ON plot USING GIST (geometry);
+-- ------------------------------------------------------------
+-- IRRIGATION SYSTEMS
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS irrigation_system (
+id SERIAL PRIMARY KEY,
+plot_id INT REFERENCES plot(id) ON DELETE CASCADE,
+type VARCHAR(50) CHECK (type IN ('drip','sprinkler','surface')),
+capacity DOUBLE PRECISION,
+status VARCHAR(20) DEFAULT 'active' CHECK (status IN
+('active','inactive','maintenance'))
+);
+-- ------------------------------------------------------------
+-- SENSORS
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sensor (
+id SERIAL PRIMARY KEY,
+plot_id INT NOT NULL REFERENCES plot(id) ON DELETE CASCADE,
+name VARCHAR(100),
+type VARCHAR(50) NOT NULL CHECK (type IN
+('humidity','temperature','soil_moisture','rainfall','wind_speed')),
+unit VARCHAR(20),
+device_id VARCHAR(100) UNIQUE,
+latitude DOUBLE PRECISION,
+longitude DOUBLE PRECISION,
+installed_at TIMESTAMP,
+active BOOLEAN DEFAULT TRUE,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sensor_plot ON sensor(plot_id);
+CREATE INDEX IF NOT EXISTS idx_sensor_type ON sensor(type);
+PÁGINA 22
+
+===== PAGE 24 =====
+-- ------------------------------------------------------------
+-- SENSOR READINGS (TimescaleDB hypertable)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sensor_reading (
+time TIMESTAMPTZ NOT NULL,
+sensor_id INT NOT NULL REFERENCES sensor(id) ON DELETE CASCADE,
+value DOUBLE PRECISION NOT NULL,
+quality SMALLINT DEFAULT 1
+);
+SELECT create_hypertable('sensor_reading','time', if_not_exists => TRUE);
+CREATE INDEX IF NOT EXISTS idx_reading_sensor_time ON
+sensor_reading(sensor_id, time DESC);
+-- ------------------------------------------------------------
+-- WEATHER DATA (dados reais/observados)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS weather_data (
+id SERIAL PRIMARY KEY,
+plot_id INT REFERENCES plot(id) ON DELETE CASCADE,
+time TIMESTAMPTZ NOT NULL,
+temperature DOUBLE PRECISION,
+humidity DOUBLE PRECISION,
+rainfall DOUBLE PRECISION,
+wind_speed DOUBLE PRECISION,
+source VARCHAR(50) DEFAULT 'openmeteo'
+);
+CREATE INDEX IF NOT EXISTS idx_weather_plot_time ON weather_data(plot_id,
+time DESC);
+-- ------------------------------------------------------------
+-- WEATHER FORECAST (previsão)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS weather_forecast (
+id SERIAL PRIMARY KEY,
+plot_id INT REFERENCES plot(id) ON DELETE CASCADE,
+forecast_time TIMESTAMPTZ NOT NULL,
+temperature DOUBLE PRECISION,
+rainfall DOUBLE PRECISION,
+probability_rain DOUBLE PRECISION,
+fetched_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+-- ------------------------------------------------------------
+-- RULES (Regras de alerta)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS rule (
+id SERIAL PRIMARY KEY,
+PÁGINA 23
+
+===== PAGE 25 =====
+name VARCHAR(100),
+sensor_type VARCHAR(50) NOT NULL,
+threshold DOUBLE PRECISION NOT NULL,
+condition VARCHAR(10) CHECK (condition IN ('>','<','=','>=','<=')),
+severity VARCHAR(20) DEFAULT 'warning' CHECK (severity IN
+('info','warning','critical')),
+active BOOLEAN DEFAULT TRUE,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- ------------------------------------------------------------
+-- ALERTS
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS alert (
+id SERIAL PRIMARY KEY,
+sensor_id INT REFERENCES sensor(id) ON DELETE SET NULL,
+rule_id INT REFERENCES rule(id) ON DELETE SET NULL,
+message TEXT NOT NULL,
+value DOUBLE PRECISION,
+severity VARCHAR(20) DEFAULT 'warning',
+resolved BOOLEAN DEFAULT FALSE,
+resolved_at TIMESTAMP,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_alert_sensor ON alert(sensor_id);
+CREATE INDEX IF NOT EXISTS idx_alert_created ON alert(created_at DESC);
+-- ------------------------------------------------------------
+-- COST RECORDS
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cost_record (
+id SERIAL PRIMARY KEY,
+plot_id INT REFERENCES plot(id) ON DELETE CASCADE,
+category VARCHAR(50) DEFAULT 'water',
+description TEXT,
+amount NUMERIC(10,2) NOT NULL,
+date DATE NOT NULL,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_cost_plot ON cost_record(plot_id);
+-- ------------------------------------------------------------
+-- SEED DATA (demo)
+-- ------------------------------------------------------------
+INSERT INTO app_user (name, email, password, role)
+VALUES ('Admin', 'admin@iotrega.pt', '$2b$10$placeholder_hash', 'admin')
+ON CONFLICT (email) DO NOTHING;
+PÁGINA 24
+
+===== PAGE 26 =====
+INSERT INTO farm (name, description, location)
+VALUES ('Quinta do Demo', 'Exploração vitivinícola de demonstração',
+ST_GeographyFromText('SRID=4326;POINT(-8.6291 41.1579)'))
+ON CONFLICT DO NOTHING;
+3.4. ESTADO ATUAL E RESULTADOS PRELIMINARES
+Nesta fase do desenvolvimento, o projeto encontra-se numa etapa avançada ao nível da
+implementação backend, já possuindo uma infraestrutura funcional capaz de suportar
+a recolha, processamento e disponibilização de dados IoT relacionados com
+monitorização agrícola e apoio à gestão de rega.
+Com base na análise do código atualmente implementado, verifica-se que o sistema já
+integra:
+● comunicação MQTT;
+● APIs REST;
+● autenticação JWT;
+● armazenamento temporal e geoespacial;
+● motor de alertas;
+● integração meteorológica;
+● agregação de dados para dashboards.
+A arquitetura da aplicação encontra-se estruturada segundo uma abordagem modular,
+organizada em:
+● rotas;
+● serviços;
+● middleware;
+● configuração de base de dados.
+Esta organização facilita manutenção, escalabilidade e evolução futura do sistema.
+Infraestrutura Backend
+O backend encontra-se desenvolvido em:
+● Node.js;
+● Express;
+● PostgreSQL;
+● PostGIS;
+● TimescaleDB.
+A ligação à base de dados é gerida através de um pool de conexões PostgreSQL,
+permitindo melhor desempenho e reutilização de ligações .
+PÁGINA 25
+
+===== PAGE 27 =====
+Também já se encontram implementados:
+● helpers para transações;
+● middleware global de tratamento de erros;
+● wrappers assíncronos para rotas REST .
+Sistema de Autenticação
+O sistema de autenticação encontra-se funcional e implementa:
+● registo de utilizadores;
+● login;
+● geração de tokens JWT;
+● autenticação baseada em middleware;
+● controlo de permissões.
+As rotas de autenticação permitem:
+● criação de utilizadores;
+● login seguro com bcrypt;
+● validação de tokens JWT;
+● recuperação do utilizador autenticado .
+O middleware implementado já suporta:
+● proteção de rotas;
+● controlo de acesso administrativo;
+● validação automática do token .
+Gestão Agrícola e Geoespacial
+O sistema já possui CRUD completo para:
+● explorações agrícolas (farms);
+● talhões (plots);
+● sensores IoT.
+A gestão de explorações agrícolas inclui:
+● associação de utilizadores a explorações;
+● controlo de permissões;
+● suporte geográfico via PostGIS .
+Os talhões agrícolas suportam:
+● armazenamento de geometrias;
+● exportação GeoJSON;
+PÁGINA 26
+
+===== PAGE 28 =====
+● integração com mapas;
+● consultas espaciais .
+Esta funcionalidade demonstra já integração efetiva com tecnologias SIG (Sistemas de
+Informação Geográfica).
+Sistema de Sensores IoT
+A gestão de sensores encontra-se implementada com suporte para:
+● criação;
+● atualização;
+● consulta;
+● eliminação de sensores.
+O sistema suporta múltiplos tipos de sensores:
+● temperatura;
+● humidade;
+● humidade do solo;
+● precipitação;
+● velocidade do vento .
+Também já foi implementada:
+● associação de sensores a talhões;
+● consulta da última leitura;
+● estado ativo/inativo;
+● localização geográfica opcional dos sensores.
+Sistema MQTT e Simulação IoT
+A componente MQTT encontra-se implementada e funcional.
+O serviço MQTT já suporta:
+● ligação a broker;
+● subscrição de tópicos;
+● ingestão automática de mensagens;
+● processamento JSON;
+● inserção automática de leituras na base de dados .
+Um dos aspetos mais relevantes já implementados é o sistema de simulação IoT,
+permitindo:
+● simular sensores reais;
+● gerar leituras automáticas;
+PÁGINA 27
+
+===== PAGE 29 =====
+● testar o sistema sem hardware físico;
+● validar o pipeline completo de dados .
+Atualmente, o sistema consegue:
+1. gerar dados simulados;
+2. publicar mensagens MQTT;
+3. processar leituras;
+4. armazenar dados;
+5. avaliar regras;
+6. gerar alertas automaticamente.
+Leituras Temporais e TimescaleDB
+A gestão de leituras encontra-se implementada com suporte a:
+● inserção individual;
+● ingestão em lote;
+● consultas temporais;
+● agregações temporais;
+● estatísticas.
+O sistema já utiliza funcionalidades do TimescaleDB, incluindo:
+time_bucket()
+para agregação temporal de leituras .
+As APIs permitem:
+● consultar leituras por período;
+● obter estatísticas;
+● calcular médias;
+● obter mínimos e máximos;
+● gerar dados para dashboards e gráficos.
+Sistema de Alertas Inteligentes
+O sistema de regras e alertas encontra-se implementado de forma funcional.
+Já foi desenvolvido:
+● CRUD de regras;
+● avaliação automática de condições;
+● geração persistente de alertas;
+● prevenção de alertas duplicados;
+● resolução de alertas .
+PÁGINA 28
+
+===== PAGE 30 =====
+As regras suportam operadores:
+>, <, >=, <=, =
+O motor de alertas avalia automaticamente cada leitura recebida via MQTT,
+permitindo monitorização contínua e comportamento orientado a eventos.
+Integração Meteorológica
+A integração com a API Open-Meteo encontra-se funcional.
+O sistema já suporta:
+● recolha automática de dados meteorológicos;
+● armazenamento de clima histórico;
+● armazenamento de previsões meteorológicas;
+● atualização automática por talhão .
+A localização dos talhões é utilizada para calcular:
+● latitude;
+● longitude;
+● centroides geográficos via PostGIS.
+As previsões armazenadas incluem:
+● temperatura;
+● precipitação;
+● humidade;
+● velocidade do vento;
+● probabilidade de chuva.
+Dashboard e APIs de Agregação
+Já foi implementado um módulo de dashboard responsável pela agregação de dados do
+sistema.
+O backend fornece endpoints capazes de:
+● resumir informação agrícola;
+● calcular custos;
+● obter leituras recentes;
+● apresentar alertas ativos;
+● gerar dados agregados para gráficos .
+As APIs suportam:
+PÁGINA 29
+
+===== PAGE 31 =====
+● agregações temporais;
+● consultas resumidas;
+● preparação de dados para visualização frontend.
+Gestão de Custos
+O sistema já inclui um módulo de gestão de custos operacionais.
+Este módulo permite:
+● registar custos;
+● categorizar despesas;
+● gerar resumos mensais;
+● associar custos aos talhões .
+Esta funcionalidade acrescenta uma componente de gestão económica à plataforma.
+Testes e Validação
+Até ao momento, foram realizados testes funcionais às principais componentes
+implementadas:
+Testes realizados
+● testes de autenticação JWT;
+● testes de APIs REST;
+● testes de ingestão MQTT;
+● testes de simulação IoT;
+● testes de geração automática de alertas;
+● testes de inserção de leituras;
+● testes de consultas geoespaciais;
+● testes de integração meteorológica.
+Os testes efetuados demonstram que o sistema já é capaz de:
+● receber dados IoT;
+● processar leituras em tempo real;
+● armazenar séries temporais;
+● gerar alertas automáticos;
+● fornecer dados agregados via API.
+Limitações Atuais
+PÁGINA 30
+
+===== PAGE 32 =====
+Apesar da evolução significativa do backend, algumas componentes estão em falta ou
+continuam em desenvolvimento:
+● frontend completo;
+● dashboards gráficos finais;
+● notificações externas (email/SMS);
+● integração com sensores físicos reais;
+● automatização da rega;
+Próximas Etapas
+As próximas fases do projeto incluem:
+● Conclusão ingestão IoT
+● Identificação das personas da aplicação
+● Desenvolvimento completo da interface frontend;
+● Integração com mapas interativos;
+● Implementação de notificações;
+● Otimização de performance;
+Conclusão do Estado Atual
+Com base na implementação atualmente desenvolvida, o projeto já possui uma
+infraestrutura backend robusta e funcional, demonstrando capacidade para:
+● Ingestão IoT;
+● Monitorização agrícola;
+● Armazenamento geoespacial e temporal;
+● Geração de alertas;
+● Integração climática;
+● Agregação de dados para apoio à decisão.
+A arquitetura implementada constitui uma base sólida para evolução futura da
+plataforma, encontrando-se preparada para escalabilidade e integração de
+funcionalidades inteligentes orientadas à agricultura de precisão.
+PÁGINA 31
+
+===== PAGE 33 =====
+Bibliografia
+MQTT.org. (2024). MQTT Protocol Specification.
+PostgreSQL Global Development Group. (2024). PostgreSQL Documentation.
+Open-Meteo. (2025). Weather API Documentation.
+Node.js Foundation. (2024). Node.js Documentation.
+PÁGINA 32

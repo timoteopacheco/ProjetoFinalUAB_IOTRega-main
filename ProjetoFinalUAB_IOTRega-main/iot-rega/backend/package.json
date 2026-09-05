@@ -1,0 +1,34 @@
+{
+  "name": "iot-rega-backend",
+  "version": "1.0.0",
+  "description": "Backend da plataforma IoT de gestão de rega vitivinícola",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "db:setup": "node src/config/db-setup.js",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "mqtt": "^5.3.4",
+    "dotenv": "^16.3.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5",
+    "express-validator": "^7.0.1",
+    "morgan": "^1.10.0",
+    "axios": "^1.6.2",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"]
+  }
+}
