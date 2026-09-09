@@ -1,0 +1,50 @@
+PASS tests/auth.test.js
+PASS tests/mqttSimulator.test.js
+PASS tests/weatherService.test.js
+PASS tests/rules.test.js
+PASS tests/farms.test.js
+PASS tests/plots.test.js
+PASS tests/sensors.test.js
+PASS tests/readings.test.js
+PASS tests/costs.test.js
+PASS tests/errorHandler.test.js
+PASS tests/dashboard.test.js
+PASS tests/alerts.test.js
+PASS tests/authMiddleware.test.js
+PASS tests/weatherRoutes.test.js
+PASS tests/mqttService.test.js
+PASS tests/alertService.test.js
+--------------------|---------|----------|---------|---------|-------------------------------
+File                | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s             
+--------------------|---------|----------|---------|---------|-------------------------------
+All files           |   85.58 |    88.59 |   84.81 |   85.21 |                               
+ src                |       0 |        0 |       0 |       0 |                               
+  app.js            |       0 |        0 |       0 |       0 | 4-104                         
+ src/config         |       0 |        0 |       0 |       0 |                               
+  database.js       |       0 |        0 |       0 |       0 | 4-47                          
+  db-setup.js       |       0 |      100 |       0 |       0 | 5-21                          
+ src/middleware     |     100 |    95.23 |     100 |     100 |                               
+  auth.js           |     100 |      100 |     100 |     100 |                               
+  errorHandler.js   |     100 |     92.3 |     100 |     100 | 18                            
+ src/routes         |      98 |       93 |   97.82 |   97.89 |                               
+  alerts.js         |     100 |      100 |     100 |     100 |                               
+  auth.js           |   90.47 |    78.57 |   83.33 |   90.47 | 61,99-103,116,123,153,182,197 
+  costs.js          |     100 |    93.93 |     100 |     100 | 76-86                         
+  dashboard.js      |     100 |      100 |     100 |     100 |                               
+  farms.js          |     100 |      100 |     100 |     100 |                               
+  plots.js          |     100 |    88.37 |     100 |     100 | 105,128-153,156-157           
+  readings.js       |     100 |    96.66 |     100 |     100 | 122                           
+  rules.js          |     100 |      100 |     100 |     100 |                               
+  sensors.js        |     100 |      100 |     100 |     100 |                               
+  weather.js        |     100 |      100 |     100 |     100 |                               
+ src/services       |   97.18 |    94.28 |   94.44 |   97.77 |                               
+  alertService.js   |     100 |    94.44 |     100 |     100 | 47                            
+  mqttService.js    |    94.8 |    93.47 |    90.9 |      96 | 167,173-174                   
+  weatherService.js |     100 |      100 |     100 |     100 |                               
+--------------------|---------|----------|---------|---------|-------------------------------
+
+Test Suites: 16 passed, 16 total
+Tests:       168 passed, 168 total
+Snapshots:   0 total
+Time:        11.331 s, estimated 26 s
+Ran all test suites.

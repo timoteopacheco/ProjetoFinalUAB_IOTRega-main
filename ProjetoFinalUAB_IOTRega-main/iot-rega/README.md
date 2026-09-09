@@ -304,13 +304,4 @@ O frontend foi validado num browser real (build de produção sem erros, ecrãs 
 
 ---
 
-## 📋 Próximos Passos (evolução futura)
 
-- [ ] Aplicação Mobile (React Native)
-- [ ] Notificações externas (email / SMS) para alertas críticos
-- [ ] Automatização da rega (accionamento de `irrigation_system` a partir de regras)
-- [ ] Exportação PDF/CSV de relatórios
-- [x] Testes automatizados no backend (Jest + Supertest)
-- [ ] Testes automatizados no frontend (Vitest)
-- [ ] Envio de emails (recuperação de password funciona por token, sem email)
-- [ ] Integração com sensores físicos reais (actualmente suportado via MQTT + simulador)

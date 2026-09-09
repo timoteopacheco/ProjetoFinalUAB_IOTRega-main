@@ -1,0 +1,2124 @@
+{
+  "info": {
+    "_postman_id": "b7a1c4e2-9f31-4d68-8a52-1c0f3e7d5a10",
+    "name": "IoT Rega API",
+    "description": "Testes funcionais à API REST da plataforma IoT Rega (Projeto Final em Engenharia Informática — UAb).\n\nA coleção percorre o ciclo de vida completo dos recursos: regista um utilizador com email aleatório, cria exploração, talhão e sensor, ingere leituras, cria regras e custos, consulta clima e dashboard, e elimina tudo no fim. Pode ser executada de ponta a ponta no Collection Runner ou com Newman.\n\nPré-requisitos: backend a correr em http://localhost:3000 com PostgreSQL/PostGIS ligado e o schema aplicado (npm run db:setup). O pedido POST /weather/refresh requer ligação à Internet (API Open-Meteo).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Teste global aplicado a todos os pedidos da coleção",
+          "pm.test('Tempo de resposta abaixo de 3000 ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000/api" },
+    { "key": "password", "value": "segredo123" },
+    { "key": "new_password", "value": "novaPass456" }
+  ],
+  "item": [
+    {
+      "name": "01 - Sistema",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] },
+            "description": "Verifica que o serviço está no ar. Endpoint público."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"status = 'ok'\", () => pm.expect(b.status).to.eql('ok'));",
+                  "pm.test('Devolve versao e nome do servico', function () {",
+                  "    pm.expect(b).to.have.property('version');",
+                  "    pm.expect(b.service).to.eql('IoT Rega API');",
+                  "});",
+                  "pm.test('Devolve timestamp valido', () => pm.expect(new Date(b.timestamp).toString()).to.not.eql('Invalid Date'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /rota-inexistente (404)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/nao-existe", "host": ["{{base_url}}"], "path": ["nao-existe"] },
+            "description": "Confirma o handler 404 global."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de rota nao encontrada', () => pm.expect(pm.response.json().error).to.eql('Rota não encontrada'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Autenticacao",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Utilizador de Teste\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+            "description": "Regista um utilizador com email aleatório (gerado no pre-request) e guarda o token para os pedidos seguintes."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Email aleatorio para a coleccao poder correr repetidamente",
+                  "const email = 'teste_' + Date.now() + '@iotrega.pt';",
+                  "pm.collectionVariables.set('email', email);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve utilizador e token', function () {",
+                  "    pm.expect(b).to.have.property('token');",
+                  "    pm.expect(b.user).to.have.property('id');",
+                  "});",
+                  "pm.test('Nunca devolve a password', () => pm.expect(b.user).to.not.have.property('password'));",
+                  "pm.test('Email corresponde ao registado', () => pm.expect(b.user.email).to.eql(pm.collectionVariables.get('email')));",
+                  "pm.collectionVariables.set('token', b.token);",
+                  "pm.collectionVariables.set('user_id', b.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/register - email invalido (400)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Teste\",\n  \"email\": \"nao-e-email\",\n  \"password\": \"segredo123\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+            "description": "Validação do express-validator: email mal formado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devolve array de erros de validacao', function () {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.errors).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(b.errors.map(e => e.path)).to.include('email');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/register - password curta (400)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Teste\",\n  \"email\": \"curta_{{$timestamp}}@iotrega.pt\",\n  \"password\": \"123\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+            "description": "Password com menos de 6 caracteres é rejeitada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Erro aponta para o campo password', function () {",
+                  "    const paths = pm.response.json().errors.map(e => e.path);",
+                  "    pm.expect(paths).to.include('password');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+            "description": "Autentica o utilizador criado e renova o token guardado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve token JWT com 3 segmentos', function () {",
+                  "    pm.expect(b.token).to.be.a('string');",
+                  "    pm.expect(b.token.split('.')).to.have.lengthOf(3);",
+                  "});",
+                  "pm.test('Devolve dados do utilizador sem password', function () {",
+                  "    pm.expect(b.user.email).to.eql(pm.collectionVariables.get('email'));",
+                  "    pm.expect(b.user).to.not.have.property('password');",
+                  "});",
+                  "pm.collectionVariables.set('token', b.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login - password errada (401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"password-errada\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Mensagem generica (nao revela se o email existe)', () => pm.expect(pm.response.json().error).to.eql('Credenciais inválidas'));",
+                  "pm.test('Nao devolve token', () => pm.expect(pm.response.json()).to.not.have.property('token'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login - utilizador inexistente (401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"inexistente_{{$timestamp}}@iotrega.pt\",\n  \"password\": \"segredo123\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+            "description": "A mensagem tem de ser igual à da password errada, para impedir enumeração de contas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Mesma mensagem que password errada', () => pm.expect(pm.response.json().error).to.eql('Credenciais inválidas'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] },
+            "description": "Dados do utilizador do token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Corresponde ao utilizador autenticado', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('user_id')));",
+                  "pm.test('Nao expoe o hash da password', () => pm.expect(b).to.not.have.property('password'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me - sem token (401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] },
+            "description": "Middleware authenticate: cabeçalho Authorization em falta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Indica token em falta', () => pm.expect(pm.response.json().error).to.eql('Token de autenticação em falta'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me - token invalido (401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer token.completamente.invalido" }],
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Indica token invalido', () => pm.expect(pm.response.json().error).to.eql('Token inválido'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/change-password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"current_password\": \"{{password}}\",\n  \"new_password\": \"{{new_password}}\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/change-password", "host": ["{{base_url}}"], "path": ["auth", "change-password"] },
+            "description": "Altera a password validando a actual."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma alteracao', () => pm.expect(pm.response.json().message).to.eql('Password alterada com sucesso'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/change-password - actual errada (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"current_password\": \"password-errada\",\n  \"new_password\": \"outraPass789\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/change-password", "host": ["{{base_url}}"], "path": ["auth", "change-password"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Indica password actual incorrecta', () => pm.expect(pm.response.json().error).to.eql('A password actual está incorrecta.'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login - com a nova password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{new_password}}\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+            "description": "Confirma que a alteração de password teve efeito e renova o token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 com a nova password', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/forgot-password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/forgot-password", "host": ["{{base_url}}"], "path": ["auth", "forgot-password"] },
+            "description": "Gera token de recuperação (válido 30 min). Fora de produção o token vem na resposta e é aqui capturado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Resposta generica', () => pm.expect(b.message).to.include('Se existir uma conta'));",
+                  "pm.test('Token devolvido em ambiente de desenvolvimento', () => pm.expect(b).to.have.property('token'));",
+                  "if (b.token) { pm.collectionVariables.set('reset_token', b.token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/forgot-password - email inexistente",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"ninguem_{{$timestamp}}@iotrega.pt\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/forgot-password", "host": ["{{base_url}}"], "path": ["auth", "forgot-password"] },
+            "description": "Não pode revelar se a conta existe: mesma resposta, sem token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Mesma mensagem generica', () => pm.expect(b.message).to.include('Se existir uma conta'));",
+                  "pm.test('Nao devolve token para email inexistente', () => pm.expect(b).to.not.have.property('token'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/reset-password - token invalido (400)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"new_password\": \"qualquer123\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/reset-password", "host": ["{{base_url}}"], "path": ["auth", "reset-password"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica token invalido ou expirado', () => pm.expect(pm.response.json().error).to.eql('Token inválido ou expirado.'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/reset-password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{reset_token}}\",\n  \"new_password\": \"{{password}}\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/reset-password", "host": ["{{base_url}}"], "path": ["auth", "reset-password"] },
+            "description": "Repõe a password original usando o token capturado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma redefinicao', () => pm.expect(pm.response.json().message).to.eql('Password redefinida com sucesso'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login - password reposta",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+            "description": "Confirma o fim do ciclo de recuperação e renova o token para o resto da coleção."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 com a password reposta', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Exploracoes (Farms)",
+      "item": [
+        {
+          "name": "POST /farms",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Quinta de Teste\",\n  \"description\": \"Exploracao criada pelos testes Postman\",\n  \"latitude\": 41.16,\n  \"longitude\": -7.78\n}" },
+            "url": { "raw": "{{base_url}}/farms", "host": ["{{base_url}}"], "path": ["farms"] },
+            "description": "Cria exploração numa transação (farm + user_farm como owner)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve id e nome', function () {",
+                  "    pm.expect(b).to.have.property('id');",
+                  "    pm.expect(b.name).to.eql('Quinta de Teste');",
+                  "});",
+                  "pm.collectionVariables.set('farm_id', b.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /farms - latitude invalida (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Quinta Invalida\",\n  \"latitude\": 999,\n  \"longitude\": -7.78\n}" },
+            "url": { "raw": "{{base_url}}/farms", "host": ["{{base_url}}"], "path": ["farms"] },
+            "description": "Latitude fora do intervalo -90..90."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Erro no campo latitude', () => pm.expect(pm.response.json().errors.map(e => e.path)).to.include('latitude'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /farms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/farms", "host": ["{{base_url}}"], "path": ["farms"] },
+            "description": "Lista apenas as explorações do utilizador autenticado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve um array', () => pm.expect(b).to.be.an('array'));",
+                  "pm.test('Inclui a exploracao criada', () => pm.expect(b.map(f => f.id)).to.include(Number(pm.collectionVariables.get('farm_id'))));",
+                  "pm.test('Cada exploracao traz coordenadas e contagem de talhoes', function () {",
+                  "    const f = b.find(x => x.id === Number(pm.collectionVariables.get('farm_id')));",
+                  "    pm.expect(f).to.have.property('latitude');",
+                  "    pm.expect(f).to.have.property('longitude');",
+                  "    pm.expect(f).to.have.property('plot_count');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /farms/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/farms/{{farm_id}}", "host": ["{{base_url}}"], "path": ["farms", "{{farm_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Id corresponde ao pedido', () => pm.expect(b.id).to.eql(Number(pm.collectionVariables.get('farm_id'))));",
+                  "pm.test('Devolve localizacao em GeoJSON', () => pm.expect(b.location_geojson).to.include('Point'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /farms/:id - inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/farms/999999", "host": ["{{base_url}}"], "path": ["farms", "999999"] },
+            "description": "Isolamento entre utilizadores: recurso de outrem ou inexistente devolve 404, não 403."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de exploracao nao encontrada', () => pm.expect(pm.response.json().error).to.eql('Exploração não encontrada'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /farms/:id",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Quinta de Teste (actualizada)\",\n  \"description\": \"Descricao actualizada\",\n  \"latitude\": 41.17,\n  \"longitude\": -7.79\n}" },
+            "url": { "raw": "{{base_url}}/farms/{{farm_id}}", "host": ["{{base_url}}"], "path": ["farms", "{{farm_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Nome actualizado', () => pm.expect(b.name).to.eql('Quinta de Teste (actualizada)'));",
+                  "pm.test('Coordenadas actualizadas', function () {",
+                  "    pm.expect(Number(b.latitude)).to.be.closeTo(41.17, 0.0001);",
+                  "    pm.expect(Number(b.longitude)).to.be.closeTo(-7.79, 0.0001);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /farms/:id - campos em falta (400)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"So descricao\"\n}" },
+            "url": { "raw": "{{base_url}}/farms/{{farm_id}}", "host": ["{{base_url}}"], "path": ["farms", "{{farm_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica campos obrigatorios', () => pm.expect(pm.response.json().error).to.include('obrigatórios'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Talhoes (Plots)",
+      "item": [
+        {
+          "name": "POST /plots",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"farm_id\": {{farm_id}},\n  \"name\": \"Talhao Norte\",\n  \"area\": 2.5,\n  \"crop_type\": \"vinha\",\n  \"geojson\": {\n    \"type\": \"Polygon\",\n    \"coordinates\": [[[-7.78, 41.16], [-7.77, 41.16], [-7.77, 41.17], [-7.78, 41.17], [-7.78, 41.16]]]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/plots", "host": ["{{base_url}}"], "path": ["plots"] },
+            "description": "Cria talhão a partir de um polígono GeoJSON. Sem position, o backend calcula o centróide."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('Associado a exploracao correcta', () => pm.expect(b.farm_id).to.eql(Number(pm.collectionVariables.get('farm_id'))));",
+                  "pm.test('Position calculada a partir do centroide', function () {",
+                  "    pm.expect(b.position).to.be.an('object');",
+                  "    pm.expect(b.position.type).to.eql('Point');",
+                  "    pm.expect(b.position.coordinates[0]).to.be.closeTo(-7.775, 0.01);",
+                  "    pm.expect(b.position.coordinates[1]).to.be.closeTo(41.165, 0.01);",
+                  "});",
+                  "pm.collectionVariables.set('plot_id', b.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /plots?farm_id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/plots?farm_id={{farm_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["plots"],
+              "query": [{ "key": "farm_id", "value": "{{farm_id}}" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve um array com o talhao criado', function () {",
+                  "    pm.expect(b).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(b.map(p => p.id)).to.include(Number(pm.collectionVariables.get('plot_id')));",
+                  "});",
+                  "pm.test('Geometria devolvida como GeoJSON Polygon', function () {",
+                  "    const p = b.find(x => x.id === Number(pm.collectionVariables.get('plot_id')));",
+                  "    pm.expect(p.geojson.type).to.eql('Polygon');",
+                  "    pm.expect(p).to.have.property('sensor_count');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /plots/geojson",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/plots/geojson?farm_id={{farm_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["plots", "geojson"],
+              "query": [{ "key": "farm_id", "value": "{{farm_id}}" }]
+            },
+            "description": "FeatureCollection pronta a carregar no Leaflet."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('E uma FeatureCollection valida', function () {",
+                  "    pm.expect(b.type).to.eql('FeatureCollection');",
+                  "    pm.expect(b.features).to.be.an('array');",
+                  "});",
+                  "pm.test('Cada feature tem geometria e propriedades', function () {",
+                  "    const f = b.features[0];",
+                  "    pm.expect(f.type).to.eql('Feature');",
+                  "    pm.expect(f.geometry).to.have.property('coordinates');",
+                  "    pm.expect(f.properties).to.have.property('crop_type');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /plots/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/plots/{{plot_id}}", "host": ["{{base_url}}"], "path": ["plots", "{{plot_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Id corresponde ao pedido', () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('plot_id'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /plots/:id",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Talhao Norte (actualizado)\",\n  \"area\": 3.1\n}" },
+            "url": { "raw": "{{base_url}}/plots/{{plot_id}}", "host": ["{{base_url}}"], "path": ["plots", "{{plot_id}}"] },
+            "description": "Actualização parcial: sem geojson no corpo, a geometria mantém-se."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Nome e area actualizados', function () {",
+                  "    pm.expect(b.name).to.eql('Talhao Norte (actualizado)');",
+                  "    pm.expect(Number(b.area)).to.eql(3.1);",
+                  "});",
+                  "pm.test('Geometria preservada apesar de nao ter sido enviada', () => pm.expect(b.geojson.type).to.eql('Polygon'));",
+                  "pm.test('Cultura preservada', () => pm.expect(b.crop_type).to.eql('vinha'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /plots/:id - crop_type invalido (400)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"crop_type\": \"bananeira\"\n}" },
+            "url": { "raw": "{{base_url}}/plots/{{plot_id}}", "host": ["{{base_url}}"], "path": ["plots", "{{plot_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica tipo de cultura invalido', () => pm.expect(pm.response.json().error).to.eql('Tipo de cultura inválido.'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /plots/:id - area negativa (400)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"area\": -5\n}" },
+            "url": { "raw": "{{base_url}}/plots/{{plot_id}}", "host": ["{{base_url}}"], "path": ["plots", "{{plot_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica area invalida', () => pm.expect(pm.response.json().error).to.include('área'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Sensores",
+      "item": [
+        {
+          "name": "POST /sensors",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"plot_id\": {{plot_id}},\n  \"name\": \"Humidade Solo A\",\n  \"type\": \"soil_moisture\",\n  \"unit\": \"%\",\n  \"device_id\": \"esp32-postman-{{$timestamp}}\",\n  \"latitude\": 41.165,\n  \"longitude\": -7.775\n}" },
+            "url": { "raw": "{{base_url}}/sensors", "host": ["{{base_url}}"], "path": ["sensors"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('Tipo e talhao correctos', function () {",
+                  "    pm.expect(b.type).to.eql('soil_moisture');",
+                  "    pm.expect(b.plot_id).to.eql(Number(pm.collectionVariables.get('plot_id')));",
+                  "});",
+                  "pm.test('Sensor criado activo por omissao', () => pm.expect(b.active).to.eql(true));",
+                  "pm.collectionVariables.set('sensor_id', b.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /sensors - tipo invalido (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"plot_id\": {{plot_id}},\n  \"name\": \"Sensor Invalido\",\n  \"type\": \"radiacao_cosmica\"\n}" },
+            "url": { "raw": "{{base_url}}/sensors", "host": ["{{base_url}}"], "path": ["sensors"] },
+            "description": "Tipos aceites: temperature, humidity, soil_moisture, rainfall, wind_speed."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Erro no campo type', () => pm.expect(pm.response.json().errors.map(e => e.path)).to.include('type'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /sensors?plot_id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/sensors?plot_id={{plot_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["sensors"],
+              "query": [{ "key": "plot_id", "value": "{{plot_id}}" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Inclui o sensor criado', () => pm.expect(b.map(s => s.id)).to.include(Number(pm.collectionVariables.get('sensor_id'))));",
+                  "pm.test('Traz o nome do talhao e a ultima leitura', function () {",
+                  "    const s = b.find(x => x.id === Number(pm.collectionVariables.get('sensor_id')));",
+                  "    pm.expect(s).to.have.property('plot_name');",
+                  "    pm.expect(s).to.have.property('last_value');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /sensors/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/sensors/{{sensor_id}}", "host": ["{{base_url}}"], "path": ["sensors", "{{sensor_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Id corresponde ao pedido', () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('sensor_id'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /sensors/:id - inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/sensors/999999", "host": ["{{base_url}}"], "path": ["sensors", "999999"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de sensor nao encontrado', () => pm.expect(pm.response.json().error).to.eql('Sensor não encontrado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /sensors/:id",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Humidade Solo A (calibrado)\",\n  \"unit\": \"%\"\n}" },
+            "url": { "raw": "{{base_url}}/sensors/{{sensor_id}}", "host": ["{{base_url}}"], "path": ["sensors", "{{sensor_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Nome actualizado', () => pm.expect(b.name).to.eql('Humidade Solo A (calibrado)'));",
+                  "pm.test('Campos nao enviados preservados (COALESCE)', function () {",
+                  "    pm.expect(b.type).to.eql('soil_moisture');",
+                  "    pm.expect(b.active).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Leituras",
+      "item": [
+        {
+          "name": "POST /readings",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"sensor_id\": {{sensor_id}},\n  \"value\": 32.4\n}" },
+            "url": { "raw": "{{base_url}}/readings", "host": ["{{base_url}}"], "path": ["readings"] },
+            "description": "Ingestão manual. Sem time, o backend usa NOW()."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('Confirma o registo', function () {",
+                  "    pm.expect(b.message).to.eql('Leitura registada');",
+                  "    pm.expect(Number(b.value)).to.eql(32.4);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /readings - sem value (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"sensor_id\": {{sensor_id}}\n}" },
+            "url": { "raw": "{{base_url}}/readings", "host": ["{{base_url}}"], "path": ["readings"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica campos obrigatorios', () => pm.expect(pm.response.json().error).to.eql('sensor_id e value são obrigatórios'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /readings/bulk",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"readings\": [\n    { \"sensor_id\": {{sensor_id}}, \"value\": 31.8 },\n    { \"sensor_id\": {{sensor_id}}, \"value\": 30.2 },\n    { \"sensor_id\": {{sensor_id}}, \"value\": 29.5 }\n  ]\n}" },
+            "url": { "raw": "{{base_url}}/readings/bulk", "host": ["{{base_url}}"], "path": ["readings", "bulk"] },
+            "description": "Ingestão em lote num único INSERT, idempotente (ON CONFLICT DO NOTHING)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Confirma o numero de leituras inseridas', () => pm.expect(pm.response.json().message).to.eql('3 leituras inseridas'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /readings/bulk - array vazio (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"readings\": []\n}" },
+            "url": { "raw": "{{base_url}}/readings/bulk", "host": ["{{base_url}}"], "path": ["readings", "bulk"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica array obrigatorio', () => pm.expect(pm.response.json().error).to.eql('Array de leituras é obrigatório'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /readings?sensor_id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/readings?sensor_id={{sensor_id}}&limit=100",
+              "host": ["{{base_url}}"],
+              "path": ["readings"],
+              "query": [
+                { "key": "sensor_id", "value": "{{sensor_id}}" },
+                { "key": "limit", "value": "100" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve as 4 leituras inseridas', function () {",
+                  "    pm.expect(b).to.be.an('array');",
+                  "    pm.expect(b.length).to.be.at.least(4);",
+                  "});",
+                  "pm.test('Cada leitura tem time e value', function () {",
+                  "    pm.expect(b[0]).to.have.property('time');",
+                  "    pm.expect(b[0]).to.have.property('value');",
+                  "});",
+                  "pm.test('Ordenadas por time descendente', function () {",
+                  "    for (let i = 1; i < b.length; i++) {",
+                  "        pm.expect(new Date(b[i - 1].time).getTime()).to.be.at.least(new Date(b[i].time).getTime());",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /readings - agregado por interval",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/readings?sensor_id={{sensor_id}}&interval=1 hour",
+              "host": ["{{base_url}}"],
+              "path": ["readings"],
+              "query": [
+                { "key": "sensor_id", "value": "{{sensor_id}}" },
+                { "key": "interval", "value": "1 hour" }
+              ]
+            },
+            "description": "Com interval, o backend agrega com date_bin."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve buckets agregados', function () {",
+                  "    pm.expect(b).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(b[0]).to.have.property('bucket');",
+                  "    pm.expect(b[0]).to.have.property('avg_value');",
+                  "    pm.expect(b[0]).to.have.property('reading_count');",
+                  "});",
+                  "pm.test('Min <= Avg <= Max', function () {",
+                  "    const r = b[0];",
+                  "    pm.expect(Number(r.min_value)).to.be.at.most(Number(r.avg_value));",
+                  "    pm.expect(Number(r.avg_value)).to.be.at.most(Number(r.max_value));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /readings - sem sensor_id (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/readings", "host": ["{{base_url}}"], "path": ["readings"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica parametro obrigatorio', () => pm.expect(pm.response.json().error).to.eql('sensor_id é obrigatório'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /readings/latest?plot_id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/readings/latest?plot_id={{plot_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["readings", "latest"],
+              "query": [{ "key": "plot_id", "value": "{{plot_id}}" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Uma linha por sensor do talhao', function () {",
+                  "    pm.expect(b).to.be.an('array').that.is.not.empty;",
+                  "    const ids = b.map(r => r.sensor_id);",
+                  "    pm.expect(new Set(ids).size).to.eql(ids.length);",
+                  "});",
+                  "pm.test('Inclui o sensor criado com a ultima leitura', function () {",
+                  "    const r = b.find(x => x.sensor_id === Number(pm.collectionVariables.get('sensor_id')));",
+                  "    pm.expect(r).to.not.be.undefined;",
+                  "    pm.expect(r.value).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /readings/latest - sem plot_id (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/readings/latest", "host": ["{{base_url}}"], "path": ["readings", "latest"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica parametro obrigatorio', () => pm.expect(pm.response.json().error).to.eql('plot_id é obrigatório'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /readings/stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/readings/stats?sensor_id={{sensor_id}}&period=24h",
+              "host": ["{{base_url}}"],
+              "path": ["readings", "stats"],
+              "query": [
+                { "key": "sensor_id", "value": "{{sensor_id}}" },
+                { "key": "period", "value": "24h" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve as estatisticas esperadas', function () {",
+                  "    ['total_readings', 'avg_value', 'min_value', 'max_value', 'stddev_value', 'first_reading', 'last_reading']",
+                  "        .forEach(k => pm.expect(b).to.have.property(k));",
+                  "});",
+                  "pm.test('Contagem coerente com as leituras inseridas', () => pm.expect(b.total_readings).to.be.at.least(4));",
+                  "pm.test('Minimo nao superior ao maximo', () => pm.expect(Number(b.min_value)).to.be.at.most(Number(b.max_value)));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 - Regras de alerta",
+      "item": [
+        {
+          "name": "POST /rules",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Solo seco (Postman)\",\n  \"sensor_type\": \"soil_moisture\",\n  \"condition\": \"<\",\n  \"threshold\": 30,\n  \"severity\": \"warning\"\n}" },
+            "url": { "raw": "{{base_url}}/rules", "host": ["{{base_url}}"], "path": ["rules"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('Regra criada com os valores enviados', function () {",
+                  "    pm.expect(b.sensor_type).to.eql('soil_moisture');",
+                  "    pm.expect(b.condition).to.eql('<');",
+                  "    pm.expect(Number(b.threshold)).to.eql(30);",
+                  "    pm.expect(b.severity).to.eql('warning');",
+                  "});",
+                  "pm.collectionVariables.set('rule_id', b.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /rules - condicao invalida (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"sensor_type\": \"soil_moisture\",\n  \"condition\": \"aproximadamente\",\n  \"threshold\": 30\n}" },
+            "url": { "raw": "{{base_url}}/rules", "host": ["{{base_url}}"], "path": ["rules"] },
+            "description": "Condições aceites: >, <, =, >=, <=."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Erro no campo condition', () => pm.expect(pm.response.json().errors.map(e => e.path)).to.include('condition'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /rules",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/rules", "host": ["{{base_url}}"], "path": ["rules"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve um array com a regra criada', function () {",
+                  "    pm.expect(b).to.be.an('array');",
+                  "    pm.expect(b.map(r => r.id)).to.include(Number(pm.collectionVariables.get('rule_id')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /rules/:id",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"threshold\": 25,\n  \"severity\": \"critical\"\n}" },
+            "url": { "raw": "{{base_url}}/rules/{{rule_id}}", "host": ["{{base_url}}"], "path": ["rules", "{{rule_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Limite e severidade actualizados', function () {",
+                  "    pm.expect(Number(b.threshold)).to.eql(25);",
+                  "    pm.expect(b.severity).to.eql('critical');",
+                  "});",
+                  "pm.test('Condicao preservada (actualizacao parcial)', () => pm.expect(b.condition).to.eql('<'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /rules/:id - inexistente (404)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"threshold\": 10\n}" },
+            "url": { "raw": "{{base_url}}/rules/999999", "host": ["{{base_url}}"], "path": ["rules", "999999"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de regra nao encontrada', () => pm.expect(pm.response.json().error).to.eql('Regra não encontrada'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 - Alertas",
+      "item": [
+        {
+          "name": "GET /alerts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/alerts?resolved=false&limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["alerts"],
+              "query": [
+                { "key": "resolved", "value": "false" },
+                { "key": "limit", "value": "50" }
+              ]
+            },
+            "description": "Os alertas são gerados pelo alertService (cron de 5 em 5 minutos e a cada leitura MQTT). Captura um id, se existir, para o pedido de resolução."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve um array', () => pm.expect(b).to.be.an('array'));",
+                  "pm.test('Todos os alertas devolvidos estao por resolver', () => b.forEach(a => pm.expect(a.resolved).to.eql(false)));",
+                  "if (b.length) {",
+                  "    pm.collectionVariables.set('alert_id', b[0].id);",
+                  "    pm.test('Alerta traz sensor, regra e talhao associados', function () {",
+                  "        ['sensor_type', 'sensor_name', 'rule_name', 'plot_name'].forEach(k => pm.expect(b[0]).to.have.property(k));",
+                  "    });",
+                  "} else {",
+                  "    pm.collectionVariables.set('alert_id', '999999');",
+                  "    console.log('Sem alertas por resolver — o pedido seguinte valida o caminho 404.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /alerts/count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/alerts/count", "host": ["{{base_url}}"], "path": ["alerts", "count"] },
+            "description": "Contagem por severidade, usada no badge do frontend."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve um array de contagens', () => pm.expect(b).to.be.an('array'));",
+                  "pm.test('Cada linha tem severidade e total inteiro', function () {",
+                  "    b.forEach(r => {",
+                  "        pm.expect(['info', 'warning', 'critical']).to.include(r.severity);",
+                  "        pm.expect(r.total).to.be.a('number');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /alerts/:id/resolve",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/alerts/{{alert_id}}/resolve",
+              "host": ["{{base_url}}"],
+              "path": ["alerts", "{{alert_id}}", "resolve"]
+            },
+            "description": "Resolve o alerta capturado. Se a base de dados não tiver alertas por resolver, valida-se o caminho 404 com um id inexistente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const existia = pm.collectionVariables.get('alert_id') !== '999999';",
+                  "if (existia) {",
+                  "    pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "    const b = pm.response.json();",
+                  "    pm.test('Alerta marcado como resolvido', function () {",
+                  "        pm.expect(b.resolved).to.eql(true);",
+                  "        pm.expect(b.resolved_at).to.not.be.null;",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Status 404 para alerta inexistente', () => pm.response.to.have.status(404));",
+                  "    pm.test('Mensagem de alerta nao encontrado', () => pm.expect(pm.response.json().error).to.eql('Alerta não encontrado'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 - Custos",
+      "item": [
+        {
+          "name": "POST /costs",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"plot_id\": {{plot_id}},\n  \"description\": \"Consumo de agua - teste Postman\",\n  \"amount\": 148.5,\n  \"date\": \"2026-04-30\",\n  \"category\": \"water\"\n}" },
+            "url": { "raw": "{{base_url}}/costs", "host": ["{{base_url}}"], "path": ["costs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('Valores registados correctamente', function () {",
+                  "    pm.expect(Number(b.amount)).to.eql(148.5);",
+                  "    pm.expect(b.category).to.eql('water');",
+                  "    pm.expect(b.plot_id).to.eql(Number(pm.collectionVariables.get('plot_id')));",
+                  "});",
+                  "pm.collectionVariables.set('cost_id', b.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /costs - valor nao numerico (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"plot_id\": {{plot_id}},\n  \"amount\": \"cento e vinte euros\",\n  \"date\": \"2026-04-30\"\n}" },
+            "url": { "raw": "{{base_url}}/costs", "host": ["{{base_url}}"], "path": ["costs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica que o valor tem de ser numerico', () => pm.expect(pm.response.json().error).to.eql('O valor do custo tem de ser numérico.'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /costs - talhao de outro utilizador (404)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"plot_id\": 999999,\n  \"amount\": 50,\n  \"date\": \"2026-04-30\"\n}" },
+            "url": { "raw": "{{base_url}}/costs", "host": ["{{base_url}}"], "path": ["costs"] },
+            "description": "O backend valida a propriedade do talhão via user_farm antes de inserir."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de talhao sem acesso', () => pm.expect(pm.response.json().error).to.eql('Talhão não encontrado ou sem acesso à exploração.'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /costs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/costs?plot_id={{plot_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["costs"],
+              "query": [{ "key": "plot_id", "value": "{{plot_id}}" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Inclui o custo criado', () => pm.expect(b.map(c => c.id)).to.include(Number(pm.collectionVariables.get('cost_id'))));",
+                  "pm.test('Traz o nome do talhao', () => pm.expect(b[0]).to.have.property('plot_name'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /costs/summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/costs/summary?farm_id={{farm_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["costs", "summary"],
+              "query": [{ "key": "farm_id", "value": "{{farm_id}}" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Agrupa por mes e categoria', function () {",
+                  "    pm.expect(b).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(b[0]).to.have.property('month');",
+                  "    pm.expect(b[0]).to.have.property('category');",
+                  "    pm.expect(b[0]).to.have.property('total');",
+                  "});",
+                  "pm.test('Mes no formato YYYY-MM', () => pm.expect(b[0].month).to.match(/^\\d{4}-\\d{2}$/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /costs/:id",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 175.25,\n  \"category\": \"energy\"\n}" },
+            "url": { "raw": "{{base_url}}/costs/{{cost_id}}", "host": ["{{base_url}}"], "path": ["costs", "{{cost_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Valor e categoria actualizados', function () {",
+                  "    pm.expect(Number(b.amount)).to.eql(175.25);",
+                  "    pm.expect(b.category).to.eql('energy');",
+                  "});",
+                  "pm.test('Descricao preservada (actualizacao parcial)', () => pm.expect(b.description).to.include('Consumo de agua'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /costs/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/costs/{{cost_id}}", "host": ["{{base_url}}"], "path": ["costs", "{{cost_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma eliminacao', () => pm.expect(pm.response.json().message).to.eql('Registo eliminado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /costs/:id - ja eliminado (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/costs/{{cost_id}}", "host": ["{{base_url}}"], "path": ["costs", "{{cost_id}}"] },
+            "description": "Repetir o DELETE tem de devolver 404 (idempotência observável)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de registo inexistente', () => pm.expect(pm.response.json().error).to.eql('Registo não encontrado ou sem acesso.'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 - Clima",
+      "item": [
+        {
+          "name": "POST /weather/refresh",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/weather/refresh?plot_id={{plot_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["weather", "refresh"],
+              "query": [{ "key": "plot_id", "value": "{{plot_id}}" }]
+            },
+            "description": "Vai buscar dados à Open-Meteo usando o centróide do talhão. REQUER LIGAÇÃO À INTERNET."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma actualizacao', () => pm.expect(pm.response.json().message).to.eql('Dados climáticos actualizados'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /weather/refresh - talhao inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/weather/refresh?plot_id=999999",
+              "host": ["{{base_url}}"],
+              "path": ["weather", "refresh"],
+              "query": [{ "key": "plot_id", "value": "999999" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de talhao nao encontrado', () => pm.expect(pm.response.json().error).to.eql('Plot não encontrado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /weather",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/weather?plot_id={{plot_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["weather"],
+              "query": [{ "key": "plot_id", "value": "{{plot_id}}" }]
+            },
+            "description": "Observações guardadas nas últimas 24 h, após o refresh anterior."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve um array', () => pm.expect(b).to.be.an('array'));",
+                  "if (b.length) {",
+                  "    pm.test('Cada observacao traz as variaveis meteorologicas', function () {",
+                  "        ['temperature', 'humidity', 'rainfall', 'wind_speed', 'time'].forEach(k => pm.expect(b[0]).to.have.property(k));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /weather - sem plot_id (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/weather", "host": ["{{base_url}}"], "path": ["weather"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica parametro obrigatorio', () => pm.expect(pm.response.json().error).to.eql('plot_id é obrigatório'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /weather/forecast",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/weather/forecast?plot_id={{plot_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["weather", "forecast"],
+              "query": [{ "key": "plot_id", "value": "{{plot_id}}" }]
+            },
+            "description": "Previsão a 7 dias para o talhão."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Resposta em JSON', () => pm.expect(pm.response.json()).to.not.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /weather/forecast - sem plot_id (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/weather/forecast", "host": ["{{base_url}}"], "path": ["weather", "forecast"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica parametro obrigatorio', () => pm.expect(pm.response.json().error).to.eql('plot_id é obrigatório'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 - Dashboard",
+      "item": [
+        {
+          "name": "GET /dashboard/summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dashboard/summary?farm_id={{farm_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "summary"],
+              "query": [{ "key": "farm_id", "value": "{{farm_id}}" }]
+            },
+            "description": "Seis consultas em paralelo devolvidas numa só resposta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve as seis seccoes do dashboard', function () {",
+                  "    ['plots', 'sensors', 'alerts', 'latestReadings', 'costThisMonth', 'weather']",
+                  "        .forEach(k => pm.expect(b).to.have.property(k));",
+                  "});",
+                  "pm.test('Inclui o talhao criado', () => pm.expect(b.plots.map(p => p.id)).to.include(Number(pm.collectionVariables.get('plot_id'))));",
+                  "pm.test('Contagem de sensores activos coerente', function () {",
+                  "    pm.expect(Number(b.sensors.total)).to.be.at.least(1);",
+                  "    pm.expect(Number(b.sensors.active)).to.be.at.most(Number(b.sensors.total));",
+                  "});",
+                  "pm.test('Custo do mes e numerico', () => pm.expect(b.costThisMonth).to.be.a('number'));",
+                  "pm.test('Ultimas leituras incluem o sensor criado', () => pm.expect(b.latestReadings.map(r => r.id)).to.include(Number(pm.collectionVariables.get('sensor_id'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /dashboard/summary - sem farm_id (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/dashboard/summary", "host": ["{{base_url}}"], "path": ["dashboard", "summary"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica parametro obrigatorio', () => pm.expect(pm.response.json().error).to.eql('farm_id é obrigatório'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /dashboard/chart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dashboard/chart?sensor_id={{sensor_id}}&period=24h",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "chart"],
+              "query": [
+                { "key": "sensor_id", "value": "{{sensor_id}}" },
+                { "key": "period", "value": "24h" }
+              ]
+            },
+            "description": "Série temporal agregada em buckets de 1 hora (period=24h)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Devolve buckets com avg, min e max', function () {",
+                  "    pm.expect(b).to.be.an('array').that.is.not.empty;",
+                  "    ['bucket', 'avg', 'min', 'max'].forEach(k => pm.expect(b[0]).to.have.property(k));",
+                  "});",
+                  "pm.test('Ordenada por bucket ascendente', function () {",
+                  "    for (let i = 1; i < b.length; i++) {",
+                  "        pm.expect(new Date(b[i].bucket).getTime()).to.be.at.least(new Date(b[i - 1].bucket).getTime());",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 - Limpeza",
+      "item": [
+        {
+          "name": "DELETE /rules/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/rules/{{rule_id}}", "host": ["{{base_url}}"], "path": ["rules", "{{rule_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma eliminacao da regra', () => pm.expect(pm.response.json().message).to.eql('Regra eliminada'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /sensors/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/sensors/{{sensor_id}}", "host": ["{{base_url}}"], "path": ["sensors", "{{sensor_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma eliminacao do sensor', () => pm.expect(pm.response.json().message).to.eql('Sensor eliminado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /plots/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/plots/{{plot_id}}", "host": ["{{base_url}}"], "path": ["plots", "{{plot_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma eliminacao do talhao', () => pm.expect(pm.response.json().message).to.eql('Talhão eliminado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /farms/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/farms/{{farm_id}}", "host": ["{{base_url}}"], "path": ["farms", "{{farm_id}}"] },
+            "description": "Elimina a exploração em cascata, repondo o estado inicial da base de dados."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Confirma eliminacao da exploracao', function () {",
+                  "    pm.expect(b.message).to.eql('Exploração eliminada');",
+                  "    pm.expect(b.id).to.eql(Number(pm.collectionVariables.get('farm_id')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /farms/:id - apos eliminacao (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/farms/{{farm_id}}", "host": ["{{base_url}}"], "path": ["farms", "{{farm_id}}"] },
+            "description": "Confirma que a exploração deixou de estar acessível."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Exploracao ja nao existe', () => pm.expect(pm.response.json().error).to.eql('Exploração não encontrada'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

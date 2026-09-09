@@ -1,0 +1,263 @@
+PASS tests/auth.test.js (16.231 s)
+  POST /api/auth/register
+    √ cria o utilizador e devolve um token (961 ms)
+    √ rejeita passwords com menos de 6 caracteres (21 ms)
+  POST /api/auth/login
+    √ devolve token com credenciais válidas (248 ms)
+    √ rejeita password errada (218 ms)
+    √ rejeita utilizador inexistente (10 ms)
+  GET /api/auth/me
+    √ exige token (13 ms)
+    √ rejeita token expirado (16 ms)
+  POST /api/auth/change-password
+    √ altera a password com a password actual correcta (422 ms)
+    √ rejeita quando a password actual está errada (221 ms)
+  POST /api/auth/forgot-password
+    √ não revela se o email existe (12 ms)
+    √ guarda apenas o hash do token, nunca o token em claro (8 ms)
+  POST /api/auth/reset-password
+    √ rejeita token inválido ou expirado (9 ms)
+    √ redefine a password e invalida o token usado (105 ms)
+
+PASS tests/weatherService.test.js
+  fetchForPlot
+    √ grava leituras horárias e previsão diária (3 ms)
+    √ converte a probabilidade de chuva de percentagem para fracção (2 ms)
+    √ pede as coordenadas certas à API (2 ms)
+    √ devolve false sem rebentar quando a API falha (2 ms)
+    √ ignora leituras horárias fora da janela das últimas 24 horas (1 ms)
+    √ trata a probabilidade de chuva em falta como zero (1 ms)
+  fetchAllPlots
+    √ actualiza o clima de cada talhão com coordenadas (1016 ms)
+    √ não deixa escapar erros da base de dados (1 ms)
+  getForecast
+    √ devolve a previsão do talhão pedido
+    √ limita a previsão a 7 dias a partir de hoje (1 ms)
+
+PASS tests/mqttSimulator.test.js
+  simulador IoT
+    √ publica uma leitura por sensor activo em cada ciclo (7 ms)
+    √ gera valores dentro do intervalo realista de cada tipo de sensor (3 ms)
+    √ usa um device_id sintético quando o sensor não tem um definido (3 ms)
+    √ grava directamente na base de dados quando não há broker (4 ms)
+    √ continua a correr quando um ciclo falha (3 ms)
+    √ stopSimulator trava os ciclos seguintes (2 ms)
+
+PASS tests/farms.test.js
+  GET /api/farms
+    √ lista apenas as explorações do utilizador autenticado (10 ms)
+  GET /api/farms/:id
+    √ devolve a exploração pedida (7 ms)
+    √ devolve 404 para exploração de outro utilizador (6 ms)
+  POST /api/farms
+    √ cria a exploração e associa o utilizador como owner na mesma transação (16 ms)
+    √ grava a longitude antes da latitude, como exige ST_MakePoint (6 ms)
+    √ rejeita coordenadas fora do intervalo válido (5 ms)
+    √ rejeita exploração sem nome (6 ms)
+    √ faz ROLLBACK e liberta o cliente quando o INSERT falha (7 ms)
+  PUT /api/farms/:id
+    √ actualiza os dados da exploração (5 ms)
+    √ exige nome, latitude e longitude (5 ms)
+    √ rejeita coordenadas não numéricas (5 ms)
+    √ devolve 404 quando a exploração não é do utilizador (5 ms)
+  DELETE /api/farms/:id
+    √ elimina a exploração do owner (5 ms)
+    √ devolve 404 a quem não é owner (6 ms)
+
+PASS tests/plots.test.js
+  GET /api/plots
+    √ lista os talhões de todas as explorações do utilizador (7 ms)
+    √ filtra por exploração quando farm_id é indicado (7 ms)
+  GET /api/plots/geojson
+    √ devolve a FeatureCollection construída pelo PostGIS (6 ms)
+    √ devolve uma FeatureCollection vazia quando não há talhões (4 ms)
+    √ aceita o filtro por exploração (6 ms)
+  GET /api/plots/:id
+    √ devolve o talhão pedido (5 ms)
+    √ devolve 404 para talhão sem acesso (6 ms)
+  POST /api/plots
+    √ cria o talhão com a geometria recebida (14 ms)
+    √ assume vinha quando não é indicada a cultura (5 ms)
+    √ deixa a posição a null para o centróide ser calculado no PostGIS (5 ms)
+  PUT /api/plots/:id
+    √ actualiza o talhão e mantém a geometria quando não é enviada (5 ms)
+    √ rejeita nome vazio (6 ms)
+    √ rejeita tipo de cultura fora da lista permitida (5 ms)
+    √ rejeita área negativa ou não numérica (11 ms)
+    √ devolve 404 quando o talhão não pertence ao utilizador (5 ms)
+  DELETE /api/plots/:id
+    √ elimina o talhão (5 ms)
+    √ devolve 404 quando não há nada para eliminar (5 ms)
+
+PASS tests/sensors.test.js
+  GET /api/sensors
+    √ lista os sensores das explorações do utilizador (8 ms)
+    √ filtra por talhão quando plot_id é indicado (6 ms)
+  GET /api/sensors/:id
+    √ devolve o sensor pedido (6 ms)
+    √ devolve 404 para sensor de outro utilizador (5 ms)
+  POST /api/sensors
+    √ cria o sensor com os campos opcionais a null (12 ms)
+    √ guarda unidade, device_id e coordenadas quando fornecidos (5 ms)
+  PUT /api/sensors/:id
+    √ actualiza apenas os campos enviados (COALESCE mantém os restantes) (5 ms)
+    √ devolve 404 quando o sensor não existe (6 ms)
+  DELETE /api/sensors/:id
+    √ elimina o sensor (5 ms)
+
+PASS tests/readings.test.js
+  GET /api/readings
+    √ exige sensor_id (7 ms)
+    √ devolve leituras em bruto com o limite por omissão (5 ms)
+    √ respeita o intervalo temporal e o limite pedidos (5 ms)
+    √ agrega por buckets quando interval é indicado (5 ms)
+  GET /api/readings/latest
+    √ exige plot_id (5 ms)
+    √ devolve a última leitura de cada sensor do talhão (5 ms)
+  GET /api/readings/stats
+    √ usa 24 horas por omissão (5 ms)
+    √ traduz o período pedido para um intervalo SQL (10 ms)
+    √ cai para 24 horas quando o período é desconhecido (7 ms)
+  POST /api/readings
+    √ regista uma leitura (16 ms)
+    √ usa NOW() quando não é enviada a hora (6 ms)
+    √ aceita o valor zero como leitura válida (6 ms)
+    √ rejeita pedidos sem sensor_id ou sem valor (12 ms)
+  POST /api/readings/bulk
+    √ insere várias leituras num só comando (8 ms)
+    √ rejeita um corpo sem array de leituras (13 ms)
+
+PASS tests/rules.test.js
+  GET /api/rules
+    √ lista as regras existentes (9 ms)
+  POST /api/rules
+    √ cria a regra com severidade warning por omissão (14 ms)
+    √ guarda o nome e a severidade indicados (6 ms)
+  PUT /api/rules/:id
+    √ actualiza apenas os campos enviados (7 ms)
+    √ devolve 404 para regra inexistente (5 ms)
+  DELETE /api/rules/:id
+    √ elimina a regra (4 ms)
+
+PASS tests/costs.test.js
+  GET /api/costs
+    √ lista os custos das explorações do utilizador (20 ms)
+    √ acumula os filtros de talhão e ano na ordem dos parâmetros (5 ms)
+  GET /api/costs/summary
+    √ agrupa por mês e categoria para a exploração pedida (4 ms)
+  POST /api/costs
+    √ cria o registo depois de confirmar o acesso ao talhão (11 ms)
+    √ rejeita custos de talhões a que o utilizador não tem acesso (5 ms)
+    √ exige talhão, valor numérico e data (14 ms)
+  PUT /api/costs/:id
+    √ actualiza o registo do utilizador (6 ms)
+    √ rejeita valores não numéricos (5 ms)
+    √ devolve 404 quando o registo não é acessível (5 ms)
+  DELETE /api/costs/:id
+    √ elimina o registo (4 ms)
+    √ devolve 404 quando não há nada para eliminar (4 ms)
+
+PASS tests/weatherRoutes.test.js
+  GET /api/weather
+    √ exige plot_id (7 ms)
+    √ devolve as últimas 24 horas por omissão (6 ms)
+    √ respeita o intervalo temporal pedido (5 ms)
+  GET /api/weather/forecast
+    √ exige plot_id (5 ms)
+    √ delega a previsão no weatherService (6 ms)
+  POST /api/weather/refresh
+    √ devolve 404 quando o talhão não existe (6 ms)
+    √ actualiza o clima com o centróide do talhão (5 ms)
+
+PASS tests/errorHandler.test.js
+  errorHandler
+    √ traduz violação de unicidade (23505) para 409 (27 ms)
+    √ traduz chave estrangeira inválida (23503) para 400 (5 ms)
+    √ traduz violação de check constraint (23514) para 400 (6 ms)
+    √ respeita o status definido no erro (5 ms)
+    √ aceita statusCode como alternativa a status (5 ms)
+    √ devolve 500 para erros sem status (5 ms)
+    √ não expõe o stack trace fora de desenvolvimento (5 ms)
+    √ inclui o stack trace em desenvolvimento (33 ms)
+  asyncHandler
+    √ encaminha rejeições em vez de deixar a promessa pendente (5 ms)
+    √ não interfere com respostas bem sucedidas (5 ms)
+    √ chama next com o erro lançado
+    √ não chama next quando o handler resolve
+
+PASS tests/authMiddleware.test.js
+  authenticate
+    √ rejeita pedidos sem cabeçalho Authorization (7 ms)
+    √ rejeita cabeçalhos que não usem o esquema Bearer (6 ms)
+    √ rejeita um token adulterado (5 ms)
+    √ rejeita um token assinado com outro segredo (6 ms)
+    √ distingue token expirado de token inválido (6 ms)
+    √ deixa passar um token válido e preenche req.user (6 ms)
+  requireAdmin
+    √ permite o acesso a administradores (5 ms)
+    √ bloqueia utilizadores sem papel de administrador (5 ms)
+    √ bloqueia tokens sem papel definido (6 ms)
+
+PASS tests/dashboard.test.js
+  GET /api/dashboard/summary
+    √ exige farm_id (11 ms)
+    √ junta talhões, sensores, alertas, leituras, custos e clima numa só resposta (14 ms)
+    √ converte o total de custos do mês para número (10 ms)
+    √ devolve zero e clima nulo quando não há dados (31 ms)
+    √ devolve 500 quando uma das queries falha (9 ms)
+  GET /api/dashboard/chart
+    √ usa buckets de 1 hora nas últimas 24 horas por omissão (8 ms)
+    √ ajusta bucket e janela ao período pedido (12 ms)
+    √ devolve as séries agregadas (7 ms)
+
+PASS tests/alerts.test.js
+  GET /api/alerts
+    √ lista por omissão apenas os alertas por resolver (7 ms)
+    √ permite listar os alertas já resolvidos (6 ms)
+    √ devolve todos os alertas quando resolved não é true nem false (4 ms)
+    √ respeita o limite pedido (5 ms)
+  PATCH /api/alerts/:id/resolve
+    √ marca o alerta como resolvido (6 ms)
+    √ devolve 404 para alerta inexistente (5 ms)
+  GET /api/alerts/count
+    √ devolve a contagem de alertas activos por severidade (6 ms)
+
+PASS tests/mqttService.test.js
+  connect
+    √ liga ao broker configurado e regista os handlers (3 ms)
+    √ subscreve a árvore de tópicos iotrega ao ligar (1 ms)
+    √ não rebenta quando o broker devolve erro (1 ms)
+    √ não rebenta quando a ligação falha logo no arranque (1 ms)
+  ingestão de mensagens MQTT
+    √ grava a leitura e avalia as regras do sensor (1 ms)
+    √ usa a hora enviada pelo dispositivo quando existe (1 ms)
+    √ aceita o valor zero (1 ms)
+    √ ignora mensagens de dispositivos desconhecidos (1 ms)
+    √ ignora mensagens sem device_id ou sem valor
+    √ não rebenta com payloads que não são JSON (1 ms)
+    √ não rebenta quando a base de dados falha (1 ms)
+  publish
+    √ serializa objectos antes de publicar
+    √ publica strings tal como são recebidas (1 ms)
+    √ não publica enquanto o cliente estiver desligado (1 ms)
+
+PASS tests/alertService.test.js
+  evaluateCondition
+    √ avalia correctamente cada operador (2 ms)
+    √ devolve false para operadores desconhecidos (1 ms)
+  evaluateSensor
+    √ cria um alerta quando a regra é violada e não existe alerta activo (1 ms)
+    √ não duplica o alerta se já existir um por resolver (1 ms)
+    √ não cria alerta quando o valor está dentro do limite (1 ms)
+    √ termina silenciosamente se o sensor não existir
+    √ não deixa escapar erros da base de dados (1 ms)
+    √ avalia todas as regras activas do tipo de sensor (1 ms)
+  evaluateAllRules
+    √ avalia a última leitura de cada sensor activo (1 ms)
+    √ não deixa escapar erros da base de dados (1 ms)
+
+Test Suites: 16 passed, 16 total
+Tests:       168 passed, 168 total
+Snapshots:   0 total
+Time:        26.992 s
+Ran all test suites.
